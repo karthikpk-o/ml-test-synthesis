@@ -15,12 +15,12 @@ from pathlib import Path
 from config.paths import TARGET_REPOS_DIR, VALIDATION_DATA_DIR
 
 # ---------- CONFIG ----------
-OUTPUT_CSV_FILE = VALIDATION_DATA_DIR / "method_metrics_dataset.csv"
+OUTPUT_CSV_FILE = VALIDATION_DATA_DIR / "long_method_validation_dataset.csv"
 
 EVALUATION_REPOS = {"attrs", "jinja2", "itsdangerous"}
 
 FIELDNAMES = [
-    'File_Path', 'Method_Name',
+    'File_Path', 'Method_Name', 'start_line', 'end_line',
     'CC', 'lloc', 'scloc', 'comments',
     'calculated_length', 'volume', 'difficulty',
     'effort', 'time', 'bugs'
@@ -155,6 +155,8 @@ def analyze_method(node, file_content, full_cc_list, file_path, counters=None):
     return {
         'File_Path': file_path.replace('\\', '/'),
         'Method_Name': method_name,
+        'start_line': node_start,
+        'end_line': node_end,
         'CC': cc,
         'lloc': lloc,
         'scloc': scloc,

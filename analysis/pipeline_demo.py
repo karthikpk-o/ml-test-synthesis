@@ -4,7 +4,7 @@ from analysis.risk import classify_risk
 from recommendations.rules import recommend_tests
 
 
-def run_pipeline(repo_path: str, function: dict):
+def run_pipeline(repo_path: str, function: dict, coverage_data=None):
     """
     function dict must contain:
       - file
@@ -29,7 +29,8 @@ def run_pipeline(repo_path: str, function: dict):
     # -----------------------------
     # Step 1: Coverage
     # -----------------------------
-    coverage_data = collect_coverage(repo_path)
+    if coverage_data is None:
+        coverage_data = collect_coverage(repo_path)
 
     # -----------------------------
     # Step 2: Function coverage

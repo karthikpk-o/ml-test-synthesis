@@ -28,7 +28,7 @@ MAX_SMELLY_SAMPLES = 200
 MAX_NON_SMELLY_SAMPLES = 800
 
 FIELDNAMES = [
-    'File_Path', 'Method_Name', 'is_Long_Method',
+    'File_Path', 'Method_Name', 'start_line', 'end_line', 'is_Long_Method',
     'CC', 'lloc', 'scloc', 'comments',
     'calculated_length', 'volume', 'difficulty',
     'effort', 'time', 'bugs'
@@ -162,6 +162,8 @@ def analyze_method(node, file_content, full_cc_list, file_path, counters=None):
     return {
         'File_Path': file_path.replace('\\', '/'),
         'Method_Name': method_name,
+        'start_line': node_start,
+        'end_line': node_end,
         'is_Long_Method': get_smell_label(lloc, cc),
         'CC': cc,
         'lloc': lloc,

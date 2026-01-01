@@ -1,18 +1,26 @@
 from pathlib import Path
 
-# Project root = ml-test-synthesis/
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# __file__ is <project-root>/ml-test-synthesis/config/paths.py
+_this_file = Path(__file__).resolve()
 
-# Workspace
-WORKSPACE_DIR = PROJECT_ROOT / "workspace"
+# PROJECT_ROOT = <project-root>/ml-test-synthesis/
+PROJECT_ROOT = _this_file.parents[1]
+
+# GLOBAL_ROOT = <project-root>/
+GLOBAL_ROOT = PROJECT_ROOT.parent
+
+# WORKSPACE_DIR = <project-root>/workspace/
+WORKSPACE_DIR = GLOBAL_ROOT / "workspace"
+
+# TARGET_REPOS_DIR = <project-root>/workspace/target-repos/
 TARGET_REPOS_DIR = WORKSPACE_DIR / "target-repos"
+
+# VENVS_DIR = <project-root>/workspace/venvs/
 VENVS_DIR = WORKSPACE_DIR / "venvs"
 
-# Data
+# Data and Models remain inside the project repository
 DATA_DIR = PROJECT_ROOT / "data"
-TRAINING_DATA_DIR = DATA_DIR / "training"
+TRAINING_DATA_DIR = DATA_DIR / "train"
 VALIDATION_DATA_DIR = DATA_DIR / "validation"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-
-# Models
 MODELS_DIR = PROJECT_ROOT / "models"

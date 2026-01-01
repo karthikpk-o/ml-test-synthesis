@@ -18,7 +18,7 @@ REPOS = {
     },
 }
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = ROOT / "workspace"
 TARGET_REPOS = WORKSPACE / "target-repos"
 VENVS = WORKSPACE / "venvs"
@@ -62,15 +62,21 @@ def setup_repo(name, url, ref):
 
     python = venv_path / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
-    req_dev = repo_path / "requirements-dev.txt"
-    req = repo_path / "requirements.txt"
+    # Upgrade pip
+    run([str(python), "-m", "pip", "install", "--upgrade", "pip"])
 
-    if req_dev.exists():
-        run([str(python), "-m", "pip", "install", "-r", str(req_dev)])
-    elif req.exists():
+    # 1️⃣ Install runtime requirements if present
+    req = repo_path / "requirements.txt"
+    if req.exists():
         run([str(python), "-m", "pip", "install", "-r", str(req)])
-    else:
-        run([str(python), "-m", "pip", "install", "pytest", "coverage"])
+
+    # 2️⃣ Install the package itself (CRITICAL)
+    run([str(python), "-m", "pip", "install", "-e", str(repo_path)])
+
+    # 3️⃣ Install minimal test tooling
+    run([str(python), "-m", "pip", "install", "pytest", "coverage", "hypothesis", "freezegun"])
+
+
 
 
 def main():
