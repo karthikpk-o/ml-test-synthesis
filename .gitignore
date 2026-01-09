@@ -7,6 +7,7 @@ venvs/
 
 # Coverage artifacts
 .coverage
+*_coverage.json
 coverage.json
 htmlcov/
 
