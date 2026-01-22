@@ -82,6 +82,11 @@ def main():
     print("\n🧠 Aggregating ML predictions with coverage & risk analysis...")
     run_step("analysis.post_ml_aggregate")
 
+    #----- Reporting ------
+    print("\nGenerating Reports...")
+    run_step("reporting.1_final_results_visualization")
+    run_step("reporting.2_ml_smell_visualizations")
+
     print("\n" + "=" * 60)
     print("✅ PIPELINE EXECUTION COMPLETE")
     print("=" * 60)

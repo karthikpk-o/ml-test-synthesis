@@ -18,6 +18,9 @@ REPOS = {
         "jinja2": ("https://github.com/pallets/jinja.git", "3.1.3"),
         "itsdangerous": ("https://github.com/pallets/itsdangerous.git", "2.1.2"),
     },
+    "ci_demo": {
+        "werkzeug" : ("https://github.com/pallets/werkzeug.git", "main"),
+    },
 }
 
 # ----------------------------
@@ -92,7 +95,7 @@ def setup_repo(name, url, ref, category):
         run([str(python), "-m", "pip", "install", "-r", str(req)])
 
     # 2️⃣ Install package with test extras if available (CRITICAL)
-    if category == "validation":
+    if category == "validation" or category == "ci_demo":
     # Validation repos MUST be runnable + coverable
         try:
             run([str(python), "-m", "pip", "install", "-e", f"{repo_path}[tests]"])
@@ -101,7 +104,8 @@ def setup_repo(name, url, ref, category):
 
         run([
             str(python), "-m", "pip", "install",
-            "coverage", "pytest", "hypothesis", "freezegun"
+            "coverage", "pytest", "hypothesis", "freezegun", "cffi",
+            "cryptography", "ephemeral-port-reserve", "pytest-timeout", "watchdog"
         ])
     else:
         # Training repos: NO editable install, NO tests

@@ -2,20 +2,20 @@ import subprocess
 import json
 from pathlib import Path
 import sys
+import os
 
-from config.paths import (
-    TARGET_REPOS_DIR,
-    VENVS_DIR,
-    DATA_DIR,
-)
+from config.paths import TARGET_REPOS_DIR, VENVS_DIR, DATA_DIR, CI_WORKSPACE_COVERAGE
+
+
+CI_MODE = os.getenv("CI_MODE") == "1"
+CI_WORKSPACE = Path(os.getenv("CI_WORKSPACE", DATA_DIR))
+TARGET_REPO = Path(os.getenv("TARGET_REPO", TARGET_REPOS_DIR))
+
 
 VALIDATION_REPOS = {"attrs", "jinja2", "itsdangerous"}
 
-# ---------------------------------------------------------
-# Repo → package override (explicit, intentional)
-# ---------------------------------------------------------
 REPO_PACKAGE_OVERRIDES = {
-    "attrs": "attr",           # attrs repo exposes runtime package 'attr'
+    "attrs": "attr",
     "jinja2": "jinja2",
     "itsdangerous": "itsdangerous",
 }
@@ -26,185 +26,134 @@ class CoverageError(Exception):
 
 
 # ---------------------------------------------------------
-# Package detection (flat + src layout)
+# Package detection
 # ---------------------------------------------------------
 def detect_package_name(repo_path: Path) -> str:
-    """
-    Detect the primary Python package in a repository.
-
-    Supports:
-    - Flat layout: repo/<pkg>/__init__.py
-    - Src layout:  repo/src/<pkg>/__init__.py
-
-    Fails explicitly if the package cannot be uniquely determined.
-    """
-
     candidates = []
 
-    # Flat layout
     for p in repo_path.iterdir():
-        if (
-            p.is_dir()
-            and (p / "__init__.py").exists()
-            and p.name not in {"tests", "test"}
-        ):
+        if p.is_dir() and (p / "__init__.py").exists() and p.name not in {"tests", "test"}:
             candidates.append(p.name)
 
-    # src/ layout
     src_dir = repo_path / "src"
     if src_dir.exists():
         for p in src_dir.iterdir():
             if p.is_dir() and (p / "__init__.py").exists():
                 candidates.append(p.name)
 
-    candidates = sorted(set(candidates))
-
-    # Explicit override takes precedence
     repo_name = repo_path.name
     if repo_name in REPO_PACKAGE_OVERRIDES:
         return REPO_PACKAGE_OVERRIDES[repo_name]
 
+    candidates = sorted(set(candidates))
     if len(candidates) != 1:
-        raise CoverageError(
-            f"Could not uniquely detect Python package in {repo_path}. "
-            f"Found candidates: {candidates}"
-        )
+        raise CoverageError(f"Could not uniquely detect package. Found: {candidates}")
 
     return candidates[0]
 
 
 # ---------------------------------------------------------
-# Pytest exclusions (global, conservative)
+# Resolve python (venv for research, CI python otherwise)
 # ---------------------------------------------------------
-def pytest_args() -> list[str]:
-    """
-    Global pytest exclusions for environment-sensitive tests.
+def resolve_python(repo_name: str) -> Path:
+    if CI_MODE:
+        return Path(sys.executable)
 
-    - Excludes static type-checking tests (mypy / pyright)
-    - Excludes deprecation-warning assertion tests
-    - Does NOT affect runtime execution paths
-    """
+    py = VENVS_DIR / repo_name / "bin" / "python"
+    if not py.exists():
+        raise CoverageError(f"Missing repo venv python: {py}")
+    return py
+
+def pytest_args() -> list[str]:
     return ["-k", "not mypy and not TestAssoc"]
 
 
 # ---------------------------------------------------------
-# Resolve repo-specific virtualenv python
+# Coverage execution
 # ---------------------------------------------------------
-def resolve_venv_python(repo_name: str) -> Path:
-    """
-    Resolve the Python executable for the repository-specific virtualenv.
-    """
-    venv_python = VENVS_DIR / repo_name / "bin" / "python"
+def collect_coverage(repo_path: Path, python_exec: Path) -> dict:
+    package = detect_package_name(repo_path)
 
-    if not venv_python.exists():
-        raise CoverageError(
-            f"Virtualenv not found for repo '{repo_name}': {venv_python}"
-        )
-
-    return venv_python
-
-
-# ---------------------------------------------------------
-# Coverage collection (ONE repo at a time)
-# ---------------------------------------------------------
-def collect_coverage(repo_path: Path) -> dict:
-    repo_path = repo_path.resolve()
-
-    if not repo_path.exists():
-        raise CoverageError(f"Repo path does not exist: {repo_path}")
-
-    repo_name = repo_path.name
-    package_name = detect_package_name(repo_path)
-    venv_python = resolve_venv_python(repo_name)
-
-    # -----------------------------
-    # Step 1: Run coverage + pytest
-    # -----------------------------
     cmd = [
-        str(venv_python),
+        str(python_exec),
         "-m",
         "coverage",
         "run",
-        "--rcfile=/dev/null",        # ignore repo-specific configs
-        f"--source={package_name}",  # restrict to Python package only
+        "--rcfile=/dev/null",
+        f"--source={package}",
         "-m",
         "pytest",
     ]
     cmd += pytest_args()
 
     try:
-        subprocess.run(
-            cmd,
-            cwd=repo_path,
-            check=True,
-        )
+        subprocess.run(cmd, cwd=repo_path, check=True)
     except subprocess.CalledProcessError:
-        raise CoverageError(
-            f"Coverage execution failed for repository: {repo_name}"
-        )
+        raise CoverageError("Coverage run failed")
 
-    # -----------------------------
-    # Step 2: Generate JSON report
-    # -----------------------------
+    json_out = repo_path / "coverage_tmp.json"
+
     try:
         subprocess.run(
-            [
-                str(venv_python),
-                "-m",
-                "coverage",
-                "json",
-                "-o",
-                "coverage.json",
-            ],
+            [str(python_exec), "-m", "coverage", "json", "-o", str(json_out)],
             cwd=repo_path,
             check=True,
         )
     except subprocess.CalledProcessError:
-        raise CoverageError(
-            f"Coverage JSON generation failed for repository: {repo_name}"
-        )
+        raise CoverageError("Coverage JSON failed")
 
-    coverage_file = repo_path / "coverage.json"
-    if not coverage_file.exists():
-        raise CoverageError("coverage.json not generated")
-
-    with open(coverage_file, "r") as f:
-        return json.load(f)
+    with open(json_out, "r") as f:
+        data = json.load(f)
+    
+    json_out.unlink()
+    return data
 
 
 # ---------------------------------------------------------
-# CLI entrypoint (explicit, one-shot)
+# CLI Entry
 # ---------------------------------------------------------
 if __name__ == "__main__":
+
+    # ---------------- CI MODE ----------------
+    # --- inside __main__ CI block replace repo resolution only ---
+
+    if CI_MODE:
+        repo = Path(sys.argv[1]) if len(sys.argv) > 1 else TARGET_REPO
+        py = Path(sys.executable)
+
+        try:
+            cov = collect_coverage(repo, py)
+            out = CI_WORKSPACE_COVERAGE / "coverage.json"
+            with open(out, 'w') as f:
+                json.dump(cov, f, indent=2)
+            print(f"[OK] CI coverage collected and saved to -> {out}")
+        except CoverageError as e:
+            print(f"[ERROR] {e}")
+            sys.exit(2)
+
+        sys.exit(0)
+
+    # ---------------- RESEARCH MODE ----------------
     if len(sys.argv) != 2:
         print("Usage: python analysis/coverage.py <repo-name>")
-        print("Example: python analysis/coverage.py attrs")
         sys.exit(1)
 
     repo_name = sys.argv[1]
-
     if repo_name not in VALIDATION_REPOS:
-        print(
-            f"[SKIP] Coverage is only collected for validation repos.\n"
-            f"Requested: {repo_name}\n"
-            f"Allowed: {sorted(VALIDATION_REPOS)}"
-        )
+        print("[SKIP] Only validation repos supported")
         sys.exit(0)
 
     repo_path = TARGET_REPOS_DIR / repo_name
-
+    python_exec = resolve_python(repo_name)
 
     DATA_DIR.mkdir(exist_ok=True)
 
     try:
-        coverage_data = collect_coverage(repo_path)
-
-        output_file = DATA_DIR / f"{repo_name}_coverage.json"
-        with open(output_file, "w") as f:
-            json.dump(coverage_data, f, indent=2)
-
-        print(f"[OK] Coverage saved to: {output_file}")
-
+        cov = collect_coverage(repo_path, python_exec)
+        out = DATA_DIR / f"{repo_name}_coverage.json"
+        with open(out, 'w') as f:
+            json.dump(cov, f, indent=2)
+        print(f"[OK] Coverage saved for {repo_name} in path → {out}")
     except CoverageError as e:
         print(f"[ERROR] {e}")
         sys.exit(2)

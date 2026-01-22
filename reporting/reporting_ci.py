@@ -2,59 +2,63 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
-from config.paths import PROCESSED_DATA_DIR, REPORTS_DIR
+from config.paths import CI_WORKSPACE_PROCESSED, CI_WORKSPACE_REPORTS
 
-FINAL_RESULTS_FILE = os.path.join(PROCESSED_DATA_DIR, "final_results.csv")
+DATA_DIR = CI_WORKSPACE_PROCESSED
+REPORTS_DIR = CI_WORKSPACE_REPORTS
 
-def load_and_clean_data(file_path):
-    """
-    Standardizes headers, simplifies absolute paths, ensures repository 
-    consistency, and removes duplicates.
-    """
+FINAL_RESULTS_FILE = os.path.join(DATA_DIR, "final_results.csv")
+ML_PREDICTIONS_FILE = os.path.join(DATA_DIR, "ml_smell_predictions.csv")
+
+def load_and_clean(file_path):
+    """Loads CSV, standardizes headers, simplifies paths, and removes duplicates."""
     if not os.path.exists(file_path):
-        print(f"Error: {file_path} not found.")
+        print(f"Warning: {file_path} not found.")
         return None
-
+    
     df = pd.read_csv(file_path)
+    df.columns = df.columns.str.lower()
 
-    # A. Simplify paths (removes system-specific prefixes)
+    # Simplify absolute paths
     def simplify_path(path):
         p = str(path).replace('\\', '/').lower().strip()
         if 'target-repos/' in p:
             return p.split('target-repos/')[-1]
         return p
 
-    # B. Standardize columns and values
-    df.columns = df.columns.str.lower()
     df['method_name'] = df['method_name'].astype(str).str.strip().str.lower()
     df['file_path'] = df['file_path'].apply(simplify_path)
     
-    # Standardize labels to UPPERCASE for consistency
+    # Standardize smell_label to UPPERCASE for color mapping
     if 'smell_label' in df.columns:
         df['smell_label'] = df['smell_label'].astype(str).str.upper().str.strip()
-    
+
+    # Ensure repo_name consistency
     if 'repo_name' in df.columns:
         df['repo_name'] = df['repo_name'].astype(str).str.lower().str.strip()
-        # Prepend repo name to path if missing to ensure uniqueness
         repos = df['repo_name'].unique()
         mask = ~df['file_path'].str.startswith(tuple(repos))
         df.loc[mask, 'file_path'] = df['repo_name'] + "/" + df['file_path']
 
-    # C. Remove duplicates to ensure unique method counts
+    # Deduplicate unique methods
     df = df.drop_duplicates(subset=['method_name', 'file_path'], keep='first')
-    
     return df
 
 # --- MAIN EXECUTION ---
-df_final = load_and_clean_data(FINAL_RESULTS_FILE)
+df_final = load_and_clean(FINAL_RESULTS_FILE)
+df_ml = load_and_clean(ML_PREDICTIONS_FILE)
 
 # Set global aesthetic style
 sns.set_theme(style="whitegrid")
 
+# ---------------------------------------------------------
+# VISUALIZATION 1: High Smells Geography (from final_results)
+# ---------------------------------------------------------
 if df_final is not None:
-    # --- VISUALIZATION 1: High Smells Geography ---
     plt.figure(figsize=(12, 7))
     truth_counts = df_final.groupby(['repo_name', 'smell_label']).size().unstack(fill_value=0)
+    
+    # Ensure both HIGH and LOW labels exist
     for label in ['HIGH', 'LOW']:
         if label not in truth_counts.columns: truth_counts[label] = 0
     truth_counts = truth_counts[['HIGH', 'LOW']]
@@ -73,30 +77,15 @@ if df_final is not None:
     plt.close()
     print("Created: 1_actual_risk_landscape.png")
 
-
-    # --- VISUALIZATION 2: Average Coverage by Repo ---
-    plt.figure(figsize=(10, 6))
-    avg_cov = df_final.groupby('repo_name')['coverage_percent'].mean().sort_values(ascending=False)
-    ax2 = avg_cov.plot(kind='bar', color='skyblue')
-    plt.title('Average Code Coverage by Repository')
-    plt.ylabel('Mean Coverage (%)')
-    plt.xticks(rotation=45)
-    for p in ax2.patches:
-        ax2.annotate(f'{p.get_height():.1f}%', (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha='center', va='bottom', fontweight='bold')
-    plt.savefig(os.path.join(REPORTS_DIR, '1_coverage_by_repo.png'), bbox_inches='tight')
-    plt.close()
-    print("Created: 1_coverage_by_repo.png")
-
-
-    # --- UPDATED VISUALIZATION 3: Risk Distribution per Repository ---
+# ---------------------------------------------------------
+# VISUALIZATION 2: Risk Distribution per Repository (from final_results)
+# ---------------------------------------------------------
+if df_final is not None:
     repos = df_final['repo_name'].unique()
     fig, axes = plt.subplots(1, len(repos), figsize=(18, 6))
-
     if len(repos) == 1:
-        axes = [axes]  # Handle single repo case
+        axes = [axes]
 
-    # Canonical risk → color mapping
     risk_color_map = {
         "Hidden Risk": "red",
         "Refactor Candidate": "orange",
@@ -104,18 +93,9 @@ if df_final is not None:
         "Safe Zone": "green"
     }
 
-# Fixed semantic order (optional but highly recommended)
-    risk_order = ["Hidden Risk", "Refactor Candidate", "Low Value", "Safe Zone"]
-
     for i, repo in enumerate(repos):
         repo_data = df_final[df_final['repo_name'] == repo]
-
-        risk_counts = (
-            repo_data['risk_category']
-            .value_counts()
-            .reindex(risk_order)
-            .dropna()
-        )
+        risk_counts = repo_data['risk_category'].value_counts()
 
         labels = risk_counts.index.tolist()
         colors = [risk_color_map[label] for label in labels]
@@ -130,26 +110,29 @@ if df_final is not None:
         axes[i].set_title(f'Risk Profile: {repo.capitalize()}')
 
     plt.suptitle('Risk Category Distribution per Repository', fontsize=16)
-    plt.savefig(os.path.join(REPORTS_DIR, '1_risk_distribution_per_repo.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(REPORTS_DIR, '2_risk_distribution.png'), bbox_inches='tight')
     plt.close()
-    print("Created: 1_risk_distribution_per_repo.png")
+    print(" Created: 2_risk_distribution_per_repo.png")
 
-
-
-    # --- VISUALIZATION 4: Quality Audit (Smell vs Coverage) ---
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(
-        x='smell_label', 
-        y='coverage_percent', 
-        data=df_final, 
-        hue='smell_label', 
-        palette={'HIGH': '#d62728', 'LOW': '#1f77b4'},
-        legend=False
+# ---------------------------------------------------------
+# VISUALIZATION 3: Top 10 Methods by Maintenance Effort (from ml_smell_predictions)
+# ---------------------------------------------------------
+if df_ml is not None:
+    plt.figure(figsize=(12, 6))
+    # Select top 10 by effort
+    top_10_effort = df_ml.nlargest(10, 'effort')
+    # Shorten names for cleaner display
+    top_10_effort['display_name'] = top_10_effort['method_name'].apply(
+        lambda x: x[:25] + '...' if len(x) > 25 else x
     )
-    plt.title('Audit: Do High-Smell Methods have enough Coverage?')
-    plt.ylabel('Coverage (%)')
-    plt.savefig(os.path.join(REPORTS_DIR, '1_smell_vs_coverage.png'), bbox_inches='tight')
+    
+    sns.barplot(x='effort', y='display_name', data=top_10_effort, palette='Reds_r')
+    
+    plt.title('Top 10 Methods by Maintenance Effort (Halstead)', fontsize=14)
+    plt.xlabel('Halstead Effort Score')
+    plt.ylabel('Method Name')
+    plt.savefig(os.path.join(REPORTS_DIR, '3_ml_top_10_effort.png'), bbox_inches='tight')
     plt.close()
-    print("Created: 1_smell_vs_coverage.png")
+    print(" Created: 3_ml_top_10_effort.png")
 
 print(f"\n Success! All reports have been generated in: {os.path.abspath(REPORTS_DIR)}")
