@@ -46,5 +46,6 @@ def run_analysis(repo_root: Path):
     run_step("ml.inference", project_root, repo_root)
     run_step("analysis.coverage", project_root, repo_root)
     run_step("analysis.post_ml_aggregate", project_root, repo_root)
+    run_step("reporting.reporting_ci", project_root, repo_root)
 
     print("\n✅ CI ANALYSIS COMPLETE")

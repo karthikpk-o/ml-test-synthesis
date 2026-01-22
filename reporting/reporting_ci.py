@@ -2,16 +2,10 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from config.paths import CI_WORKSPACE_PROCESSED, CI_WORKSPACE_REPORTS
 
-# 1. Setup Paths
-# Since you are running from ml-test-synthesis/reporting:
-# ../ci_workspace/processed/ takes you to the data
-# ../ci_workspace/reports/ takes you to the reports folder
-DATA_DIR = "../ci_workspace/processed/"
-REPORTS_DIR = "../ci_workspace/reports"
-
-# Ensure reports directory exists
-os.makedirs(REPORTS_DIR, exist_ok=True)
+DATA_DIR = CI_WORKSPACE_PROCESSED
+REPORTS_DIR = CI_WORKSPACE_REPORTS
 
 FINAL_RESULTS_FILE = os.path.join(DATA_DIR, "final_results.csv")
 ML_PREDICTIONS_FILE = os.path.join(DATA_DIR, "ml_smell_predictions.csv")

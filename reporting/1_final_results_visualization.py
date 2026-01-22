@@ -2,15 +2,9 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from config.paths import PROCESSED_DATA_DIR, REPORTS_DIR
 
-# 1. Setup Paths
-DATA_DIR = "../data/processed/"
-REPORTS_DIR = "../data/reports"
-
-# Ensure reports directory exists at the root level
-os.makedirs(REPORTS_DIR, exist_ok=True)
-
-FINAL_RESULTS_FILE = os.path.join(DATA_DIR, "final_results.csv")
+FINAL_RESULTS_FILE = os.path.join(PROCESSED_DATA_DIR, "final_results.csv")
 
 def load_and_clean_data(file_path):
     """

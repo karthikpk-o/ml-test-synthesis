@@ -2,16 +2,9 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from config.paths import PROCESSED_DATA_DIR, REPORTS_DIR
 
-# 1. Setup Paths
-# "../" moves up from 'reporting' to the project root 'ml-test-synthesis'
-DATA_DIR = "../data/processed/"
-REPORTS_DIR = "../data/reports"
-
-# Ensure reports directory exists at the root level
-os.makedirs(REPORTS_DIR, exist_ok=True)
-
-ML_PREDICTIONS_FILE = os.path.join(DATA_DIR, "ml_smell_predictions.csv")
+ML_PREDICTIONS_FILE = os.path.join(PROCESSED_DATA_DIR, "ml_smell_predictions.csv")
 
 def load_and_clean_ml_data(file_path):
     """
