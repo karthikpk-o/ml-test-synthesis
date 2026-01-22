@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 import os
 
-from config.paths import TARGET_REPOS_DIR, VENVS_DIR, DATA_DIR
+from config.paths import TARGET_REPOS_DIR, VENVS_DIR, DATA_DIR, CI_WORKSPACE_COVERAGE
 
 
 CI_MODE = os.getenv("CI_MODE") == "1"
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
         try:
             cov = collect_coverage(repo, py)
-            out = CI_WORKSPACE / "coverage.json"
+            out = CI_WORKSPACE_COVERAGE / "coverage.json"
             with open(out, 'w') as f:
                 json.dump(cov, f, indent=2)
             print(f"[OK] CI coverage collected and saved to -> {out}")
