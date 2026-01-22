@@ -2,23 +2,13 @@
 import shutil
 from pathlib import Path
 import sys
-
+from config.paths import PROJECT_ROOT, GLOBAL_ROOT, DATA_DIR, PROCESSED_DATA_DIR, MODELS_DIR, WORKSPACE_DIR, REPORTS_DIR
+from config.paths import CI_WORKSPACE_COVERAGE, CI_WORKSPACE_METRICS, CI_WORKSPACE_REPORTS, CI_WORKSPACE_PROCESSED, CI_WORKSPACE
+from config.paths import TRAINING_DATA_DIR, VALIDATION_DATA_DIR
 # ---------------------------------------------------------
 # Path resolution (authoritative)
 # ---------------------------------------------------------
 THIS_FILE = Path(__file__).resolve()
-
-PROJECT_ROOT = THIS_FILE.parents[1]          # <project-root>
-ML_ROOT = PROJECT_ROOT / "ml-test-synthesis"
-
-DATA_DIR = ML_ROOT / "data"
-TRAIN_FILE = DATA_DIR / "train" / "long_method_training_dataset.csv"
-VALID_FILE = DATA_DIR / "validation" / "long_method_validation_dataset.csv"
-PROCESSED_DIR = DATA_DIR / "processed"
-
-MODELS_DIR = ML_ROOT / "models"
-WORKSPACE_DIR = PROJECT_ROOT / "workspace"
-
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
@@ -51,19 +41,17 @@ def remove_dir_contents_preserve_gitkeep(dir_path: Path):
 # ---------------------------------------------------------
 def main():
     print("🧭 cleanup.py location :", THIS_FILE)
-    print("🧭 project root        :", PROJECT_ROOT)
-    print("🧭 ml-test-synthesis   :", ML_ROOT)
+    print("🧭 project root        :", GLOBAL_ROOT)
+    print("🧭 ml-test-synthesis   :", PROJECT_ROOT)
     print()
 
     # Hard sanity check
-    if not ML_ROOT.exists() or not DATA_DIR.exists():
+    if not PROJECT_ROOT.exists() or not DATA_DIR.exists():
         print("❌ FATAL: ml-test-synthesis layout not detected correctly.")
         sys.exit(1)
 
     print("⚠️  WARNING: Destructive cleanup operation")
     print("This will DELETE:")
-    print(f" - {TRAIN_FILE}")
-    print(f" - {VALID_FILE}")
     print(" - contents of ml-test-synthesis/data/processed/ (except .gitkeep)")
     print(" - coverage artifacts under ml-test-synthesis/data/")
     print(" - contents of ml-test-synthesis/models/ (except .gitkeep)")
@@ -76,16 +64,32 @@ def main():
 
     print("\n🧹 Cleaning project artifacts...\n")
 
-    # 1️⃣ Training / validation datasets
-    remove_path(TRAIN_FILE)
-    remove_path(VALID_FILE)
+    # remove processed dir
+    remove_dir_contents_preserve_gitkeep(PROCESSED_DATA_DIR)
+
+    #remove reports dir
+    remove_dir_contents_preserve_gitkeep(REPORTS_DIR)
+
+    #remove train dir
+    remove_dir_contents_preserve_gitkeep(TRAINING_DATA_DIR)
+
+    #remove validation dir
+    remove_dir_contents_preserve_gitkeep(VALIDATION_DATA_DIR)
+
+    #remove ci workspace files
+    remove_dir_contents_preserve_gitkeep(CI_WORKSPACE_COVERAGE)
+    remove_dir_contents_preserve_gitkeep(CI_WORKSPACE_METRICS)
+    remove_dir_contents_preserve_gitkeep(CI_WORKSPACE_PROCESSED)
+    remove_dir_contents_preserve_gitkeep(CI_WORKSPACE_REPORTS)
 
     # 2️⃣ Clean processed directory contents (preserve folder + .gitkeep)
-    remove_dir_contents_preserve_gitkeep(PROCESSED_DIR)
+    
 
     # 3️⃣ Remove coverage artifacts under data/
     for pattern in ["*_coverage.json", "coverage.json", ".coverage"]:
         for p in DATA_DIR.rglob(pattern):
+            remove_path(p)
+        for p in CI_WORKSPACE.rglob(pattern):
             remove_path(p)
 
     # 4️⃣ Clean models directory contents (preserve folder + .gitkeep)

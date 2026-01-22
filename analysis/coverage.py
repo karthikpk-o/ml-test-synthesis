@@ -91,10 +91,7 @@ def collect_coverage(repo_path: Path, python_exec: Path) -> dict:
     except subprocess.CalledProcessError:
         raise CoverageError("Coverage run failed")
 
-    out_dir = CI_WORKSPACE / "coverage" if CI_MODE else repo_path
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    json_out = out_dir / "coverage.json"
+    json_out = repo_path / "coverage_tmp.json"
 
     try:
         subprocess.run(
@@ -108,10 +105,8 @@ def collect_coverage(repo_path: Path, python_exec: Path) -> dict:
     with open(json_out, "r") as f:
         data = json.load(f)
     
-    with open(json_out, "w") as f:
-        json.dump(data, f, indent=2)
-
-    return data 
+    json_out.unlink()
+    return data
 
 
 # ---------------------------------------------------------
@@ -128,7 +123,10 @@ if __name__ == "__main__":
 
         try:
             cov = collect_coverage(repo, py)
-            print("[OK] CI coverage collected")
+            out = CI_WORKSPACE / "coverage.json"
+            with open(out, 'w') as f:
+                json.dump(cov, f, indent=2)
+            print(f"[OK] CI coverage collected and saved to -> {out}")
         except CoverageError as e:
             print(f"[ERROR] {e}")
             sys.exit(2)
@@ -151,8 +149,11 @@ if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
 
     try:
-        collect_coverage(repo_path, python_exec)
-        print(f"[OK] Coverage saved for → {repo_name}")
+        cov = collect_coverage(repo_path, python_exec)
+        out = DATA_DIR / f"{repo_name}_coverage.json"
+        with open(out, 'w') as f:
+            json.dump(cov, f, indent=2)
+        print(f"[OK] Coverage saved for {repo_name} in path → {out}")
     except CoverageError as e:
         print(f"[ERROR] {e}")
         sys.exit(2)

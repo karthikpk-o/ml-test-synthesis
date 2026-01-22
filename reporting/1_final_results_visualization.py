@@ -92,24 +92,48 @@ if df_final is not None:
     # --- UPDATED VISUALIZATION 3: Risk Distribution per Repository ---
     repos = df_final['repo_name'].unique()
     fig, axes = plt.subplots(1, len(repos), figsize=(18, 6))
-    
-    if len(repos) == 1:
-        axes = [axes] # Handle single repo case
 
-    colors = sns.color_palette('pastel')
-    
+    if len(repos) == 1:
+        axes = [axes]  # Handle single repo case
+
+    # Canonical risk → color mapping
+    risk_color_map = {
+        "Hidden Risk": "red",
+        "Refactor Candidate": "orange",
+        "Low Value": "yellow",
+        "Safe Zone": "green"
+    }
+
+# Fixed semantic order (optional but highly recommended)
+    risk_order = ["Hidden Risk", "Refactor Candidate", "Low Value", "Safe Zone"]
+
     for i, repo in enumerate(repos):
         repo_data = df_final[df_final['repo_name'] == repo]
-        risk_counts = repo_data['risk_category'].value_counts()
-        
-        axes[i].pie(risk_counts, labels=risk_counts.index, autopct='%1.1f%%', 
-                    startangle=140, colors=colors)
+
+        risk_counts = (
+            repo_data['risk_category']
+            .value_counts()
+            .reindex(risk_order)
+            .dropna()
+        )
+
+        labels = risk_counts.index.tolist()
+        colors = [risk_color_map[label] for label in labels]
+
+        axes[i].pie(
+            risk_counts,
+            labels=labels,
+            autopct='%1.1f%%',
+            startangle=140,
+            colors=colors
+        )
         axes[i].set_title(f'Risk Profile: {repo.capitalize()}')
 
     plt.suptitle('Risk Category Distribution per Repository', fontsize=16)
     plt.savefig(os.path.join(REPORTS_DIR, '1_risk_distribution_per_repo.png'), bbox_inches='tight')
     plt.close()
     print("Created: 1_risk_distribution_per_repo.png")
+
 
 
     # --- VISUALIZATION 4: Quality Audit (Smell vs Coverage) ---
