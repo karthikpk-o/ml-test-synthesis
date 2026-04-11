@@ -135,4 +135,53 @@ if df_ml is not None:
     plt.close()
     print(" Created: 3_ml_top_10_effort.png")
 
+    # ---------------------------------------------------------
+# VISUALIZATION 4: Technical Analysis of Risky & Untested Functions
+# ---------------------------------------------------------
+if df_final is not None:
+    # Filter: HIGH smell AND Coverage < 50%
+    # Sort by CC (Complexity) to show the most difficult functions first
+    risky_untested = df_final[
+        (df_final['smell_label'] == 'HIGH') & 
+        (df_final['coverage_percent'] < 50)
+    ].sort_values(by='cc', ascending=False).head(10)
+
+    if not risky_untested.empty:
+        plt.figure(figsize=(14, 8))
+        
+        # Identifier for X-axis: "repo: method"
+        risky_untested['func_id'] = risky_untested['repo_name'] + "\n" + risky_untested['method_name']
+        
+        # Bar graph: X = Function ID, Y = Cyclomatic Complexity (CC)
+        # Hue = Coverage Percent to show the testing gap
+        ax4 = sns.barplot(
+            x='func_id', 
+            y='cc', 
+            data=risky_untested, 
+            hue='coverage_percent',
+            palette='flare_r',
+            dodge=False
+        )
+        
+        plt.title('Technical Hotspot Analysis: High-Complexity Untested Functions', fontsize=14, pad=20)
+        plt.xlabel('Function Identifier (Repository & Method)', fontsize=12)
+        plt.ylabel('Cyclomatic Complexity (CC)', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        
+        # Add CC values on top of bars for precision
+        for p in ax4.patches:
+            if p.get_height() > 0:
+                ax4.annotate(f'{int(p.get_height())}', 
+                               (p.get_x() + p.get_width() / 2., p.get_height()), 
+                               ha='center', va='bottom', fontweight='bold', fontsize=10)
+
+        plt.legend(title='Coverage %', loc='upper right')
+        
+        save_path = os.path.join(REPORTS_DIR, '4_risky_untested_functions.png')
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        print(f" Created: 4_risky_untested_functions.png")
+    else:
+        print(" Note: No High-Smell methods found with < 50% coverage for Visualization 4.")
+
 print(f"\n Success! All reports have been generated in: {os.path.abspath(REPORTS_DIR)}")
