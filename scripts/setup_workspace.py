@@ -39,10 +39,11 @@ def run(cmd, cwd=None):
     print(f"→ {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=True)
 
+PYTHON_BIN = str(Path.home() / "python311/bin/python3.11")
 
 def create_venv(path: Path):
     if not path.exists():
-        run([sys.executable, "-m", "venv", str(path)])
+        run([PYTHON_BIN, "-m", "venv", str(path)])
 
 
 def pip_install(python: Path, packages):
