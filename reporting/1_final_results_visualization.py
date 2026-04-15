@@ -152,4 +152,47 @@ if df_final is not None:
     plt.close()
     print("Created: 1_smell_vs_coverage.png")
 
+    # --- VISUALIZATION 5: Risky and Untested Functions Analysis ---
+    # Constraint 1: Must be HIGH smell
+    # Constraint 2: Must have low coverage (e.g., < 50%)
+    # Constraint 3: Show specific function names on the axis
+    
+    risky_untested = df_final[
+        (df_final['smell_label'] == 'HIGH') & 
+        (df_final['coverage_percent'] < 50)
+    ].sort_values(by='cc', ascending=False).head(10) # Top 10 for clarity
+
+    if not risky_untested.empty:
+        plt.figure(figsize=(14, 8))
+        
+        # Combine Repo and Method for a unique identifier
+        risky_untested['func_id'] = risky_untested['repo_name'] + "\n" + risky_untested['method_name']
+        
+        # Bar graph: X = Functions, Y = Complexity (CC)
+        # Color = Coverage Percent (to show how "untested" they are)
+        plot = sns.barplot(
+            x='func_id', 
+            y='cc', 
+            data=risky_untested, 
+            hue='coverage_percent',
+            palette='viridis_r'
+        )
+        
+        plt.title('Complexity Analysis of Untested High-Risk Functions', fontsize=14)
+        plt.xlabel('Function (Repository & Name)', fontsize=12)
+        plt.ylabel('Cyclomatic Complexity (CC)', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        
+        # Add labels on top of bars showing the exact CC value
+        for p in plot.patches:
+            if p.get_height() > 0:
+                plot.annotate(f'{int(p.get_height())}', 
+                               (p.get_x() + p.get_width() / 2., p.get_height()), 
+                               ha='center', va='bottom', fontweight='bold')
+
+        plt.legend(title='Coverage %', loc='upper right')
+        plt.savefig(os.path.join(REPORTS_DIR, '5_risky_untested_functions.png'), bbox_inches='tight')
+        plt.close()
+        print("Created: 5_risky_untested_functions.png")
+        
 print(f"\n Success! All reports have been generated in: {os.path.abspath(REPORTS_DIR)}")
